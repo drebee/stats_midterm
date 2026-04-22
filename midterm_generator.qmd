@@ -1,0 +1,505 @@
+---
+title: "Stats Midterm Generator"
+format: html
+editor: visual
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Code for Generators
+
+```{r}
+set.seed(1)
+```
+
+```{r}
+# midterm = 0.20
+# parts = c(
+#   original = 0.50,
+#   study_materials = 0.20,
+#   corrections_and_reflections = 0.20,
+#   retake = 0.10
+# )
+# parts*midterm
+```
+
+```{r message = FALSE, warning = FALSE}
+library(MCMCpack)
+library(tidyverse)
+
+siground = function(x, sig_figs) {
+  digits = floor(log10(x))
+  round(x*10^(-digits), sig_figs - 1)*10^digits
+}
+
+percent = function(x) {
+  str_c(x*100, "%")
+}
+```
+
+```{r}
+possible_story_structures = c(
+  "proportion",
+  "difference of proportions",
+  "mean",
+  "difference of means",
+  "mean difference",
+  "slope",
+  "chisquared"
+)
+```
+
+## Inference for a proportion
+
+```{r}
+proportion_stories = list(
+  # "" = list(
+  #   "procedure" = sample(c("test", "interval"), ),
+  #   "p0" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "p" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "sampling_methods" = c("random"),
+  #   "n_params" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "direction" = sample(c("higher", "lower", "different")),
+  #   "text" = function(params) {
+  #     sampling_method = params[["sampling_method"]]
+  #     if (sampling_method == "") {
+  #       sampling_text = str_c()
+  #     }
+  #     if (params[["procedure"]] == "interval") {
+  #       question = str_c()
+  #     } else {
+  #       question = str_c()
+  #     }
+  #     str_c(
+  #     )
+  #   }
+  # ),
+  "water" = list(
+    "procedure" = "test",
+    "p0" = c("lower" = 1/3, "upper" = 1/3, "sigfigs" = 10),
+    "p" = c("lower" = 1/3, "upper" = 0.8, "sigfigs" = 2),
+    "sampling_methods" = c("census", "census"),
+    "n_params" = c("lower" = 10, "upper" = 40, "sigfigs" = 2),
+    "direction" = "higher",
+    "text" = function(params) {
+      sampling_method = params[["sampling_method"]]
+      if (sampling_method == "") {
+        sampling_text = str_c()
+      }
+      str_c(
+        "A class did a study to see if students in the class could taste water and identify bottled water versus tap water. Each student was presented with three cups of water --- one of which contained bottled water --- and they were directed to identify which cup they thought contained bottled water. The class wants to test (at a significance level of ", params[["alpha"]], ") if they correctly identified the bottled water significantly better than they would have done by simply guessing. There are ", params[["n"]],
+        " students in the class, and ", params[["x"]], " of them correctly identified the bottled water."
+      )
+    }
+  ),
+  "lighbulbs" = list(
+    "procedure" = sample(c("test", "interval"), 1),
+    "p0" = c("lower" = 0.01, "upper" = 0.1, "sigfigs" = 1),
+    "p" = c("lower" = 0.01, "upper" = 0.1, "sigfigs" = 1),
+    "sampling_methods" = c("cluster", "random", "systematic"),
+    "n_params" = c("lower" = 20, "upper" = 100, "sigfigs" = 1),
+    "direction" = "higher",
+    "text" = function(params) {
+      sampling_method = params[["sampling_method"]]
+      if (sampling_method == "cluster") {
+        sampling_text = str_c(
+          "Leandro randomly samples 5 boxes (each containing ",
+          params[["n"]] / 5, 
+          " lightbulbs) and combines them to form a sample of ",
+          params[["n"]],
+          " lightbulbs."
+        )
+      } else if (sampling_method == "random") {
+        sampling_text = str_c(
+          "Leandro takes a random sample of ",
+          params[["n"]],
+          " bulbs."
+        )
+      } else if (sampling_method == "systematic") {
+        sampling_text = str_c(
+          "Leandro randomly samples a number between 1 and 100 for the first bulb, then samples every 10th bulb shipped to his store until he has collected a sample of ",
+          params[["n"]],
+          " bulbs."
+        )
+      }
+      if (params[["procedure"]] == "interval") {
+        question = str_c(
+          "Leandro wants to estimate (at a ",
+          params[["confidence_level"]],
+          "% confidence level) the proportion of light bulbs that arrive broken upon shipment to his store.")
+      } else {
+        question = str_c(
+          "Leandro thinks proportion of light bulbs that arrive broken upon shipment to his store might be higher than ",
+          params[["p0"]],
+          ".")
+      }
+      str_c(
+        question,
+        " His store is large, and recieves thousands of lightbulbs each week. ",
+        sampling_text,
+        " He finds that ",
+        params[["x"]],
+        " arrived broken."
+      )
+    }
+  ),
+  "approval_rating" = list(
+    "procedure" = "test",
+    "sampling_methods" = c("random", "convenience", "wording_bias"),
+    "p0" = c("lower" = 0.2, "upper" = 0.7, "sigfigs" = 1),
+    "p" = c("lower" = 0.2, "upper" = 0.7, "sigfigs" = 1),
+    "n_params" = c("lower" = 300, "upper" = 2000, "sigfigs" = 2),
+    "direction" = sample(c("lower", "different", "higher"), 1),
+    "text" = function(params) {
+      sampling_method = params[["sampling_method"]]
+      if (sampling_method == "convenience") {
+        sampling_text = str_c(
+          "She creates a poll on Twitter and invites adults in that nation to share how they feel about the prime minister. ",
+          params[["n"]],
+          " people respond to her poll."
+        )
+      } else if (sampling_method == "random") {
+        sampling_text = str_c(
+          "she takes a random sample of ",
+          params[["n"]],
+          " adults in that nation"
+        )
+      } else if (sampling_method == "wording_bias") {
+        sampling_text = str_c(
+          "She calls a random sample of ",
+          params[["n"]],
+          " registered voters in that nation and asks the question, 'Do you agree with the large percent of people who approve of the prime minister?'."
+        )
+      }
+      str_c(
+        "A large poll showed that ",
+        percent(params[["p0"]]),
+        " of adults approved of their nation's prime minister. Margot wants to test (at a significance level of α=",
+        params[["alpha"]],
+        ") if it is now ",
+        params[["direction"]], #lower, different, higher
+        ". ",
+        sampling_text,
+        " She finds that ",
+        params[["x"]],
+        " --- or ",
+        percent(params[["phat"]]),
+        " of those sampled --- approved of the prime minister."
+      )
+    }
+  )
+)
+```
+
+```{r}
+generate_proportion_story = function(story) {
+procedure = story[["procedure"]]
+
+n_params = story[["n_params"]]
+n = siground(
+  runif(1, n_params[["lower"]], n_params[["upper"]]),
+  n_params[["sigfigs"]]
+)
+if (procedure == "test") {
+  p0_params = story[["p0"]]
+  p0 = siground(runif(1, p0_params[["lower"]], p0_params[["upper"]]),
+                p0_params[["sigfigs"]])
+  direction = story[["direction"]]
+  
+  if (sample(1:2, 1) == 1) {
+    p_params = story[["p"]]
+    if (direction == "lower") {
+      p = siground(
+        runif(1, p_params[["lower"]], p0),
+              p_params[["sigfigs"]]
+        ) 
+    } else if (direction == "upper") {
+      p = siground(
+        runif(1, p0, p_params[["upper"]]),
+        p_params[["sigfigs"]]
+      ) 
+    } else {
+      p = siground(
+        runif(1, p_params[["lower"]], p_params[["upper"]]),
+        p_params[["sigfigs"]]
+      ) 
+    }
+  } else {
+    p = p0
+  }
+  sample_x = function() {
+    x = siground(rbinom(1, n, p), 2)
+    phat = x/n
+    if (direction == "lower") {
+      if (phat < p0) {
+        return(x)
+      } else {
+        return(sample_x())
+      }
+    } else if (direction == "higher") {
+      if (phat > p0) {
+        return(x)
+      } else {
+        return(sample_x())
+      }
+    } else {
+      if (phat == p) {
+        return(sample_x())
+      } else {
+        return(x)
+      }
+    }
+  }
+  x = sample_x()
+  phat = siground(x / n, 2)
+} else {
+  p_params = story[["p"]]
+  p = siground(runif(1, p_params[["lower"]], p_params[["upper"]]), p_params[["sigfigs"]])
+}
+
+confidence_level = sample(c(80, 85, 90, 95, 99), 1)
+alpha = 1 - confidence_level/100
+
+sampling_method = sample(story[["sampling_methods"]], 1)
+
+story[["text"]](
+  list(
+    "p0" = p0,
+    "n" = n,
+    "phat" = phat,
+    "procedure" = procedure,
+    "direction" = direction,
+    "x" = x,
+    "sampling_method" = sampling_method,
+    "alpha" = alpha,
+    "confidence_level" = confidence_level
+  )
+)
+}
+```
+
+## Inference for a mean
+
+```{r}
+mean_stories = list()
+generate_mean_story = function (story) {}
+```
+
+## Inference for a slope
+
+```{r}
+slope_stories = list()
+generate_slope_story = function (story) {}
+```
+
+## Inference for a difference of proportions
+
+```{r}
+diffprop_stories = list()
+generate_diffprop_story = function (story) {}
+```
+
+## Inference for a differene of means
+
+```{r}
+diffmean_stories = list()
+generate_diffmean_story = function (story) {}
+```
+
+## Inference for a mean difference
+
+```{r}
+meandiff_stories = list()
+generate_meandiff_story = function (story) {}
+```
+
+## Chi-squared
+
+```{r}
+chisquared_stories = list()
+generate_chisquared_story = function (story) {}
+```
+
+# Random Quiz Question
+
+```{r}
+story_structure = sample(possible_story_structures, 1)
+if (story_structure == "proportion") {
+  story = sample(proportion_stories, 1)[[1]]
+  story_text = generate_proportion_story(story)
+} else if (story_structure == "mean") {
+  story = sample(mean_stories, 1)[[1]]
+  story_text = generate_mean_story(story)
+} else if (story_structure == "slope") {
+  story = sample(slope_stories, 1)[[1]]
+  story_text = generate_slope_story(story)
+} else if (story_structure == "difference of proportions") {
+  story = sample(diffprop_stories, 1)[[1]]
+  story_text = generate_diffprop_story(story)
+} else if (story_structure == "difference of means") {
+  story = sample(diffmean_stories, 1)[[1]]
+  story_text = generate_diffmean_story(story)
+} else if (story_structure == "mean difference") {
+  story = sample(meandiff_stories, 1)[[1]]
+  story_text = generate_meandiff_story(story)
+} else if (story_structure == "chisquared") {
+  story = sample(chisquared_stories, 1)[[1]]
+  story_text = generate_chisquared_story(story)
+}
+```
+
+`r story_text`
+
+## Part 1: Identify the study design
+
+The individuals in this study are: 
+
+How many variables are there and what is/are the variable type(s)?
+(Check one box and fill out the question below it.)
+
+* [ ] There is one variable in the study.
+    * Variable _________ is (categorical / quantitative)
+* [ ] There are two variables in the study.
+    * Variable _________ is (categorical / quantitative)
+    * Variable _________ is (categorical / quantitative)
+
+The sample is: __________
+
+The population of interest is: ________
+
+What statistical analysis could you use to address the research question? _____________
+
+## Part 2: Represent the data
+
+Draw an appropriate graph of the sample data.
+
+`r if (story_structure %in% c("mean", "difference of means", "mean difference")) {"Describe the distribution."}`
+`r if (story_structure %in% c("slope")) {"Describe the relationship."}`
+
+## Part 3: Critique the study design
+
+Are the conditions for the appropriate statistical inference procedure met? If NOT, what improvements could you make to the study design?
+
+## Part 4: Do the statistical analysis
+
+Assume that the conditions are met (even if you showed in the previous section that they are not).
+
+State your conclusion in context, assuming conditions are met and the study design is good.
+
+## Part 5: How much do you trust the conclusion, given the actual study design?
+
+
+
+
+
+
+```{r}
+# set.seed(1)
+# n_vars = sample(c(1, 2), 1)
+# var_type = sample(c("categorical", "quantitative"), 1)
+# if (n_vars == 1) {
+#   if (var_type == "categorical") {
+#     n_groups = sample(1:5, 1)
+#   }
+#   n_groups = sample(c(1, 2), 1)
+# } else {
+#   n_groups = 1
+# }
+# data_type = str_c(n_vars, " variable ", var_type, " data (", n_groups, " group)")
+# data_type
+# if (data_type == "1 variable quantitative data (1 group)") {
+#   print("1 var quant (1)")
+#   mu = 1 #TODO
+#   sigma = #TODO
+#   mu0 = 1 #TODO
+#   n = 10 #TODO
+#   distribution_type = rnorm #TODO
+#   x = distribution_type(n, mu, sigma)
+#   print(x)
+# } else if (data_type == "1 variable categorical data (1 group)") {
+#   print("1 var cat (1)")
+#   ncats = sample(2:6, 1)
+#   concentrations = rep(1, ncats) #TODO
+#   probs = rdirichlet(1, concentrations)
+#   probs0 = c(rep(1, ncats)) #TODO
+#   n = 10 #TODO
+#   x = rmultinom(1, n, probs)
+#   print(x)
+# }  else if (data_type == "1 variable categorical data (2 group)") {
+#   print("1 var cat (2)")
+#   ncats = 2#sample(2:6, 1)
+#   concentrations = rep(1, ncats) #TODO
+#   probs1 = rdirichlet(1, concentrations)
+#   probs2 = rdirichlet(1, concentrations)
+#   # probs0 = c(rep(1, ncats)) #TODO
+#   n1 = 10 #TODO
+#   n2 = 10 #TODO
+#   x1 = rmultinom(1, n1, probs1) #TODO
+#   x2 = rmultinom(1, n2, probs1) #TODO
+#   print(x1)
+#   print(x2)
+# }else if (data_type == "1 variable quantitative data (2 group)") {
+#   print("1 var quant (2)")
+#   mu1 = 1 #TODO
+#   mu2 = 1 #TODO
+#   sigma1 = 1 #TODO
+#   sigma2 = 1 #TODO
+#   n1 = 10 #TODO
+#   n2 = 10 #TODO
+#   distribution_type = rnorm #TODO
+#   x1 = distribution_type(n1, mu1, sigma1)
+#   print(x1)
+#   x2 = distribution_type(n2, mu2, sigma2)
+#   print(x2)
+# } else if (data_type == "2 variable categorical data (1 group)") {
+#   
+# }
+
+```
+
+```{r}
+# sample_data_type = function(i = NA, allow_chisq = FALSE) {
+#   var_type =
+#     sample(
+#       c("categorical", "quantitative"),
+#       1,
+#       prob = c(1, 2)
+#     )
+#   if (allow_chisq || var_type == "quantitative") {
+#     n_vars = sample(c(1,2), 1, prob = c(2, 1))
+#   } else {
+#     n_vars = 1
+#   }
+#   if (n_vars == 1) {
+#     if (var_type == "categorical") {
+#       if (allow_chisq) {
+#         n_groups = sample(1:5, 1, prob = c(5, 5, 1, 1, 1))
+#       } else {
+#         n_groups = sample(1:2, 1)
+#       }
+#     } else if (var_type == "quantitative") {
+#       n_groups = sample(1:2, 1)
+#     }
+#   } else {
+#     n_groups = 1
+#   }
+#   data_type =
+#     str_c(
+#       n_vars,
+#       " variable ",
+#       var_type,
+#       " data (",
+#       n_groups,
+#       " group)"
+#     )
+#   data_type
+# }
+```
+
+```{r}
+# ggplot(NULL, aes(x = sapply(1:10000, sample_data_type, allow_chisq = TRUE))) +
+#   geom_bar() +
+#   coord_flip()
+```
