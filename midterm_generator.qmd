@@ -11,10 +11,6 @@ knitr::opts_chunk$set(echo = FALSE)
 # Code for Generators
 
 ```{r}
-set.seed(1)
-```
-
-```{r}
 # midterm = 0.20
 # parts = c(
 #   original = 0.50,
@@ -37,6 +33,37 @@ siground = function(x, sig_figs) {
 percent = function(x) {
   str_c(x*100, "%")
 }
+
+sample_from_range = function(params) {
+  siground(
+    runif(1, params[["lower"]], params[["upper"]]),
+    params[["sigfigs"]]
+  )
+}
+
+
+sample_x = function(sampling_function, direction, label, h0) {
+  x = sampling_function()
+  if (direction == "lower") {
+    if (x[[label]] < h0) {
+      return(x)
+    } else {
+      return(sample_x(sampling_function, direction, label, h0))
+    }
+  } else if (direction == "higher") {
+    if (x[[label]] > h0) {
+      return(x)
+    } else {
+      return(sample_x(sampling_function, direction, label, h0))
+    }
+  } else {
+    if (x[[label]] == h0) {
+      return(sample_x(sampling_function, direction, label, h0))
+    } else {
+      return(x)
+    }
+  }
+}
 ```
 
 ```{r}
@@ -51,7 +78,7 @@ possible_story_structures = c(
 )
 ```
 
-## Inference for a proportion
+## Proportion
 
 ```{r}
 proportion_stories = list(
@@ -197,66 +224,36 @@ proportion_stories = list(
 generate_proportion_story = function(story) {
 procedure = story[["procedure"]]
 
-n_params = story[["n_params"]]
-n = siground(
-  runif(1, n_params[["lower"]], n_params[["upper"]]),
-  n_params[["sigfigs"]]
-)
+n = sample_from_range(story[["n_params"]])
 if (procedure == "test") {
-  p0_params = story[["p0"]]
-  p0 = siground(runif(1, p0_params[["lower"]], p0_params[["upper"]]),
-                p0_params[["sigfigs"]])
+  p0 = sample_from_range(story[["p0"]])
   direction = story[["direction"]]
   
   if (sample(1:2, 1) == 1) {
     p_params = story[["p"]]
     if (direction == "lower") {
-      p = siground(
-        runif(1, p_params[["lower"]], p0),
-              p_params[["sigfigs"]]
-        ) 
+      p_params[["upper"]] = p0
     } else if (direction == "upper") {
-      p = siground(
-        runif(1, p0, p_params[["upper"]]),
-        p_params[["sigfigs"]]
-      ) 
-    } else {
-      p = siground(
-        runif(1, p_params[["lower"]], p_params[["upper"]]),
-        p_params[["sigfigs"]]
-      ) 
+      p_params[["lower"]] = p0
     }
+    p = sample_from_range(p_params)
   } else {
     p = p0
   }
-  sample_x = function() {
-    x = siground(rbinom(1, n, p), 2)
-    phat = x/n
-    if (direction == "lower") {
-      if (phat < p0) {
-        return(x)
-      } else {
-        return(sample_x())
-      }
-    } else if (direction == "higher") {
-      if (phat > p0) {
-        return(x)
-      } else {
-        return(sample_x())
-      }
-    } else {
-      if (phat == p) {
-        return(sample_x())
-      } else {
-        return(x)
-      }
-    }
-  }
-  x = sample_x()
+  xphat = sample_x(
+    sampling_function = function() {
+      x = siground(rbinom(1, n, p), 2)
+      phat = x/n
+      c("x" = x, "phat" = phat)
+    },
+    direction,
+    "phat",
+    p0
+  )
+  x = xphat[["x"]]
   phat = siground(x / n, 2)
 } else {
-  p_params = story[["p"]]
-  p = siground(runif(1, p_params[["lower"]], p_params[["upper"]]), p_params[["sigfigs"]])
+  p = sample_from_range(story[["p"]])
 }
 
 confidence_level = sample(c(80, 85, 90, 95, 99), 1)
@@ -264,67 +261,282 @@ alpha = 1 - confidence_level/100
 
 sampling_method = sample(story[["sampling_methods"]], 1)
 
-story[["text"]](
-  list(
-    "p0" = p0,
-    "n" = n,
-    "phat" = phat,
-    "procedure" = procedure,
-    "direction" = direction,
-    "x" = x,
-    "sampling_method" = sampling_method,
-    "alpha" = alpha,
-    "confidence_level" = confidence_level
+list(
+  "text" = story[["text"]](
+    list(
+      "p0" = p0,
+      "n" = n,
+      "phat" = phat,
+      "procedure" = procedure,
+      "direction" = direction,
+      "x" = x,
+      "sampling_method" = sampling_method,
+      "alpha" = alpha,
+      "confidence_level" = confidence_level
+    )
   )
 )
 }
 ```
 
-## Inference for a mean
+## Mean
 
 ```{r}
-mean_stories = list()
-generate_mean_story = function (story) {}
+mean_stories = list(
+  # "" = list(
+  #   "procedure" = sample(c("test", "interval"), 1),
+  #   "direction" = "higher",
+  #   "sampling_methods" = c("random", "convenience"),
+  #   "n_params" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "mu0_params" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "mu_params" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "s_params" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "text" = function(params) {
+  #     if (params[["procedure"]] == "test") {
+  #       question = str_c(
+  #       )
+  #     } else {
+  #       question = str_c(
+  #       )
+  #     }
+  #     if (params[["sampling_method"]] == "random") {
+  #       sampling_method = str_c(
+  #       )
+  #     }
+  #     str_c(
+  #     )
+  #   }
+  # ),
+  "housing" = list(
+    "procedure" = sample(c("test", "interval"), 1),
+    "direction" = "higher",
+    "sampling_methods" = c("random", "cluster", "stratified"),
+    "n_params" = c("lower" = 10, "upper" = 50, "sigfigs" = 2),
+    "mu0_params" = c("lower" = 1700, "upper" = 4000, "sigfigs" = 3),
+    "mu_params" = c("lower" = 1700, "upper" = 4000, "sigfigs" = 3),
+    "s_params" = c("lower" = 100, "upper" = 2000, "sigfigs" = 2),
+    "text" = function(params) {
+      if (params[["procedure"]] == "test") {
+        question = str_c(
+          "They plan to use this data to test the hypothesis that the average rent is now ",
+          params[["direction"]],
+          " than the previous year's average of ",
+          params[["mu0"]],
+          "."
+        )
+      } else {
+        question = str_c(
+          "They plan to use this data to estimate the average rent in the city."
+        )
+      }
+      if (params[["sampling_method"]] == "random") {
+        sampling_method = str_c(
+          "They take a random sample of ",
+          params[["n"]],
+          " rental properties."
+        )
+      } else if (params[["sampling_method"]] == "stratified") {
+        sampling_method = str_c(
+          "For each of the 5 main neighborhoods in the city, they get a random sample, and combine their data into a single sample of ",
+          params[["n"]],
+          " rental properties."
+        )
+      } else if (params[["sampling_method"]] == "cluster") {
+        sampling_method = str_c(
+          "They randomly sample 5 streets within the city and collect data on every rental property on the sampled streets. They combine the their data into a single sample of ",
+          params[["n"]],
+          " rental properties."
+        )
+      } 
+      str_c(
+        "An economist is curious about the average cost of rent per month in their large city. ",
+        sampling_method,
+        " The economist finds that those properties have a mean cost of $",
+        params[["xbar"]],
+        " per month with a standard deviation of about $",
+        params[["s"]],
+        ". ",
+        " The costs of rent per month for each of the ",
+        params[["n"]],
+        " properties and the 5-number summary of the dataset is shown below. ",
+        question
+      )
+    }
+  ),
+  "streaming" = list(
+    "procedure" = sample(c("test", "interval"), 1),
+    "direction" = "higher",
+    "sampling_methods" = c("random", "convenience"),
+    "n_params" = c("lower" = 10, "upper" = 50, "sigfigs" = 2),
+    "mu0_params" = c("lower" = 1, "upper" = 3, "sigfigs" = 2),
+    "mu_params" = c("lower" = 1, "upper" = 3, "sigfigs" = 2),
+    "s_params" = c("lower" = 0.2, "upper" = 2, "sigfigs" = 2),
+    "text" = function(params) {
+      if (params[["procedure"]] == "test") {
+        question = str_c(
+          "know if the average session length was longer than ",
+          params[["mu0"]],
+          "."
+        )
+      } else {
+        question = str_c(
+          "get a new estimate of the average session length."
+        )
+      }
+      if (params[["sampling_method"]] == "random") {
+        sampling_method = str_c(
+          " They randomly sampled ",
+          params[["n"]],
+          " users."
+        )
+      } else if (params[["sampling_method"]] == "convenience") {
+        sampling_method = str_c(
+          " They measured the session lengths for the first ",
+          params[["n"]],
+          " users who logged on to the new site."
+        )
+      }
+      str_c(
+        "A website streams movies and television shows to its subscribers. Employees know that the average time a user spends per session on their website is usually ",
+        params[["mu0"]],
+        " hours. But recently, the website changed its design, and they wanted to ",
+        question,
+        sampling_method,
+        " The session lengths of each of these ",
+        params[["n"]],
+        " users and the 5-number summary of the data are shown below.",
+        " Users in the sample had a mean session length of ",
+        params[["xbar"]],
+        " hours and a standard deviation of ",
+        params[["s"]],
+        " hours."
+      )
+    }
+  )
+)
+```
+
+```{r}
+generate_mean_story = function (story) {
+  procedure = story[["procedure"]]
+  
+  # sample size
+  n = sample_from_range(story[["n_params"]])
+  
+  direction = story[["direction"]]
+  
+  # test
+  mu0 = sample_from_range(story[["mu0_params"]])
+  s = sample_from_range(story[["s_params"]])
+  if (procedure == "test") {
+    
+    if (sample(1:2, 1) == 1) {
+      mu_params = story[["mu_params"]]
+      if (direction == "lower") {
+        mu_params[["upper"]] = mu0
+      } else if (direction == "upper") {
+        mu_params[["lower"]] = mu0
+      }
+      mu = sample_from_range(mu_params)
+    } else {
+      mu = mu0
+    }
+    x = sample_x(
+      sampling_function = function() {
+        x = round(rnorm(n, mu, s))
+        xbar = siground(mean(x), 3)
+        list("x" = x, "xbar" = xbar)
+      },
+      direction,
+      "xbar",
+      mu0
+    )[["x"]]
+    xbar = round(mean(x), 1)
+  } else {
+    mu = sample_from_range(story[["mu_params"]])
+    x = round(rnorm(n, mu, s))
+    xbar = round(mean(x), 1)
+  }
+  
+  confidence_level = sample(c(80, 85, 90, 95, 99), 1)
+  alpha = 1 - confidence_level/100
+  
+  sampling_method = sample(story[["sampling_methods"]], 1)
+  
+  df = tibble(rent = sort(x))
+  summary_table = df %>% 
+    summarise(
+      min = round(min(rent), 1),
+      q1 = round(quantile(rent, 0.25), 1),
+      median = round(median(rent), 1),
+      q3 = round(quantile(rent, 0.25), 1),
+      max = round(max(rent), 1)
+    )
+  
+  list(
+    "text" = story[["text"]](
+      list(
+        "mu0" = mu0,
+        "n" = n,
+        "xbar" = xbar,
+        "s" = s,
+        "procedure" = procedure,
+        "direction" = direction,
+        "sampling_method" = sampling_method,
+        "alpha" = alpha,
+        "confidence_level" = confidence_level
+      )
+    ),
+    "data" = df,
+    "summary" = summary_table
+  )
+}
 ```
 
 ## Inference for a slope
 
 ```{r}
-slope_stories = list()
-generate_slope_story = function (story) {}
+# slope_stories = list()
+# generate_slope_story = function (story) {}
 ```
 
 ## Inference for a difference of proportions
 
 ```{r}
-diffprop_stories = list()
-generate_diffprop_story = function (story) {}
+# diffprop_stories = list()
+# generate_diffprop_story = function (story) {}
 ```
 
 ## Inference for a differene of means
 
 ```{r}
-diffmean_stories = list()
-generate_diffmean_story = function (story) {}
+# diffmean_stories = list()
+# generate_diffmean_story = function (story) {}
 ```
 
 ## Inference for a mean difference
 
 ```{r}
-meandiff_stories = list()
-generate_meandiff_story = function (story) {}
+# meandiff_stories = list()
+# generate_meandiff_story = function (story) {}
 ```
 
 ## Chi-squared
 
 ```{r}
-chisquared_stories = list()
-generate_chisquared_story = function (story) {}
+# chisquared_stories = list()
+# generate_chisquared_story = function (story) {}
 ```
 
 # Random Quiz Question
 
 ```{r}
+# 1 - proportion (test)
+# 4 - mean (interval)
+# 9 - mean (test)
+# 
+set.seed(1)
+
 story_structure = sample(possible_story_structures, 1)
 if (story_structure == "proportion") {
   story = sample(proportion_stories, 1)[[1]]
@@ -332,25 +544,35 @@ if (story_structure == "proportion") {
 } else if (story_structure == "mean") {
   story = sample(mean_stories, 1)[[1]]
   story_text = generate_mean_story(story)
-} else if (story_structure == "slope") {
-  story = sample(slope_stories, 1)[[1]]
-  story_text = generate_slope_story(story)
-} else if (story_structure == "difference of proportions") {
-  story = sample(diffprop_stories, 1)[[1]]
-  story_text = generate_diffprop_story(story)
-} else if (story_structure == "difference of means") {
-  story = sample(diffmean_stories, 1)[[1]]
-  story_text = generate_diffmean_story(story)
-} else if (story_structure == "mean difference") {
-  story = sample(meandiff_stories, 1)[[1]]
-  story_text = generate_meandiff_story(story)
-} else if (story_structure == "chisquared") {
-  story = sample(chisquared_stories, 1)[[1]]
-  story_text = generate_chisquared_story(story)
+# } else if (story_structure == "slope") {
+#   story = sample(slope_stories, 1)[[1]]
+#   story_text = generate_slope_story(story)
+# } else if (story_structure == "difference of proportions") {
+#   story = sample(diffprop_stories, 1)[[1]]
+#   story_text = generate_diffprop_story(story)
+# } else if (story_structure == "difference of means") {
+#   story = sample(diffmean_stories, 1)[[1]]
+#   story_text = generate_diffmean_story(story)
+# } else if (story_structure == "mean difference") {
+#   story = sample(meandiff_stories, 1)[[1]]
+#   story_text = generate_meandiff_story(story)
+# } else if (story_structure == "chisquared") {
+#   story = sample(chisquared_stories, 1)[[1]]
+#   story_text = generate_chisquared_story(story)
+}
+# story_structure
+# story_text[["text"]]
+```
+
+`r story_text[["text"]]`
+
+```{r}
+if (story_structure == "mean") {
+knitr::kable(story_text[["data"]], label = "Data")
+knitr::kable(story_text[["summary"]], label = "5-number summary")
 }
 ```
 
-`r story_text`
 
 ## Part 1: Identify the study design
 
