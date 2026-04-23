@@ -1,6 +1,6 @@
 ---
 title: "Stats Midterm Generator"
-format: html
+format: docx
 editor: visual
 ---
 
@@ -69,12 +69,12 @@ sample_x = function(sampling_function, direction, label, h0) {
 ```{r}
 possible_story_structures = c(
   "proportion",
-  "difference of proportions",
-  "mean",
-  "difference of means",
-  "mean difference",
-  "slope",
-  "chisquared"
+  #"difference of proportions",
+  "mean"#,
+  #"difference of means",
+  #"mean difference",
+  #"slope",
+  #"chisquared"
 )
 ```
 
@@ -463,7 +463,7 @@ generate_mean_story = function (story) {
   
   sampling_method = sample(story[["sampling_methods"]], 1)
   
-  df = tibble(rent = sort(x))
+  df = tibble(x = sort(x))
   summary_table = df %>% 
     summarise(
       min = round(min(rent), 1),
@@ -535,7 +535,7 @@ generate_mean_story = function (story) {
 # 4 - mean (interval)
 # 9 - mean (test)
 # 
-set.seed(1)
+set.seed(2)
 
 story_structure = sample(possible_story_structures, 1)
 if (story_structure == "proportion") {
