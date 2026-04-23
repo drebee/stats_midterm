@@ -466,11 +466,11 @@ generate_mean_story = function (story) {
   df = tibble(x = sort(x))
   summary_table = df %>% 
     summarise(
-      min = round(min(rent), 1),
-      q1 = round(quantile(rent, 0.25), 1),
-      median = round(median(rent), 1),
-      q3 = round(quantile(rent, 0.25), 1),
-      max = round(max(rent), 1)
+      min = round(min(x), 1),
+      q1 = round(quantile(x, 0.25), 1),
+      median = round(median(x), 1),
+      q3 = round(quantile(x, 0.25), 1),
+      max = round(max(x), 1)
     )
   
   list(
@@ -568,7 +568,8 @@ if (story_structure == "proportion") {
 
 ```{r}
 if (story_structure == "mean") {
-knitr::kable(story_text[["data"]], label = "Data")
+  print(story_text[["data"]] %>% pull(x))
+# knitr::kable(story_text[["data"]], label = "Data")
 knitr::kable(story_text[["summary"]], label = "5-number summary")
 }
 ```
