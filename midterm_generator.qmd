@@ -164,7 +164,7 @@ proportion_stories = list(
       }
       str_c(
         question,
-        " His store is large, and recieves thousands of lightbulbs each week. ",
+        " His store is large, and receives thousands of lightbulbs each week. ",
         sampling_text,
         " He finds that ",
         params[["x"]],
@@ -225,9 +225,9 @@ generate_proportion_story = function(story) {
 procedure = story[["procedure"]]
 
 n = sample_from_range(story[["n_params"]])
+p0 = sample_from_range(story[["p0"]])
+direction = story[["direction"]]
 if (procedure == "test") {
-  p0 = sample_from_range(story[["p0"]])
-  direction = story[["direction"]]
   
   if (sample(1:2, 1) == 1) {
     p_params = story[["p"]]
@@ -251,10 +251,11 @@ if (procedure == "test") {
     p0
   )
   x = xphat[["x"]]
-  phat = siground(x / n, 2)
 } else {
   p = sample_from_range(story[["p"]])
+  x = siground(rbinom(1, n, p), 2)
 }
+phat = siground(x / n, 2)
 
 confidence_level = sample(c(80, 85, 90, 95, 99), 1)
 alpha = 1 - confidence_level/100
@@ -444,7 +445,7 @@ generate_mean_story = function (story) {
     x = sample_x(
       sampling_function = function() {
         x = round(rnorm(n, mu, s))
-        xbar = siground(mean(x), 3)
+        xbar = round(mean(x), 1)
         list("x" = x, "xbar" = xbar)
       },
       direction,
@@ -535,7 +536,7 @@ generate_mean_story = function (story) {
 # 4 - mean (interval)
 # 9 - mean (test)
 # 
-set.seed(2)
+set.seed(3)
 
 story_structure = sample(possible_story_structures, 1)
 if (story_structure == "proportion") {
