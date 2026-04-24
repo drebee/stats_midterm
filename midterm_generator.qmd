@@ -26,8 +26,15 @@ library(MCMCpack)
 library(tidyverse)
 
 siground = function(x, sig_figs) {
+  if (x == 0) {
+    return(0)
+  } else if (x > 0) {
   digits = floor(log10(x))
   round(x*10^(-digits), sig_figs - 1)*10^digits
+  } else if (x < 0) {
+  digits = floor(log10(-x))
+  round(x*10^(-digits), sig_figs - 1)*10^digits
+  }
 }
 
 percent = function(x) {
@@ -66,14 +73,16 @@ sample_x = function(sampling_function, direction, label, h0) {
 }
 ```
 
+## Question Types
+
 ```{r}
 possible_story_structures = c(
   "proportion",
   #"difference of proportions",
-  "mean"#,
+  "mean",
   #"difference of means",
   #"mean difference",
-  #"slope",
+  "slope"#,
   #"chisquared"
 )
 ```
@@ -275,7 +284,8 @@ list(
       "alpha" = alpha,
       "confidence_level" = confidence_level
     )
-  )
+  ),
+  "structure" = "proportion"
 )
 }
 ```
@@ -489,16 +499,278 @@ generate_mean_story = function (story) {
       )
     ),
     "data" = df,
-    "summary" = summary_table
+    "summary" = summary_table,
+    "structure" = "mean"
   )
 }
 ```
 
-## Inference for a slope
+## Slope
 
 ```{r}
-# slope_stories = list()
-# generate_slope_story = function (story) {}
+slope_stories = list(
+  # "" = list(
+  #   "assignment_methods" = c("random"),
+  #   "n_params" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "x_params" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "y_params" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "constraints" = "decreasing",
+  #   "shape" = sample(c("linear", "quadratic"), 1),#, "exponential", "cubic"), 1),
+  #   "sampling_methods" = c("census"),
+  #   "text" = function(params) {
+  #     sampling_method = params[["sampling_method"]]
+  #     if (sampling_method == "census") {
+  #     }
+  #     assignment_method = params[["assignment_method"]]
+  #     if (assignment_method == "random") {
+  #     }
+  #     str_c(
+  #     )
+  #   }
+  # ),
+  # "heat" = list(
+  #   "assignment_methods" = c("random"),
+  #   "n_params" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "x_params" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "y_params" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "constraints" = "decreasing",
+  #   "shape" = sample(c("linear", "quadratic"), 1),#, "exponential", "cubic"), 1),
+  #   "sampling_methods" = c("census"),
+  #   "text" = function(params) {
+  #     sampling_method = params[["sampling_method"]]
+  #     if (sampling_method == "census") {
+  #       sampling_text = str_c()
+  #     }
+  #     assignment_method = params[["assignment_method"]]
+  #     if (assignment_method == "random") {
+  #     }
+  #     str_c(
+  #       "Cindy wants to predict how much energy she will use to heat her home based on how cold it is outside. The table below shows the mean amount of gas per day (in cubic meters) that Cindy used each month and the average temperature that month (in degrees Celsius) for one heating season."
+  #     )
+  #   }
+  # ),
+  "tomatoes" = list(
+    "assignment_methods" = c("random", "confound"),
+    "n_params" = c("lower" = 5, "upper" = 12, "sigfigs" = 2),
+    "x_params" = c("lower" = 0, "upper" = 8, "sigfigs" = 1),
+    "y_params" = c("lower" = 0, "upper" = 12, "sigfigs" = 3),
+    "constraints" = "increasing",
+    "shape" = sample(c("linear", "quadratic"), 1),#, "exponential", "cubic"), 1),
+    "sampling_methods" = c("census", "convenience"),
+    "text" = function(params) {
+      sampling_method = params[["sampling_method"]]
+      if (sampling_method == "census") {
+        sampling_text = str_c("Cheryl is curious how different amounts of artificial sunlight will impact the growth of her tomatoes.")
+      } else if (sampling_method == "convenience") {
+        sampling_text = str_c("Cheryl is curious how different amounts of artificial sunlight could impact the growth of tomato plants.")
+      }
+      assignment_method = params[["assignment_method"]]
+      if (assignment_method == "random") {
+        assignment_text = str_c(
+          "For each tomato plant, she uses a random number generator to randomly choose how long to leave the grow light on for that plant."
+        )
+      } else if (assignment_method == "confound") {
+        assignment_text = str_c(
+          "She arranges the pots aesthetically from smallest (on the left) to largest (on the right) under the grow lights. Then she programs the grow lights so that the left-most plants get the least sunlight and the right-most plants get the most sunlight."
+        )
+      }
+      str_c(
+        sampling_text,
+        " She has ",
+        params[["n"]],
+        " potted tomato plants that she keeps in her home and several grow lights that work on a timer. She uses the grow lights to expose her different tomato plants to different amounts of sunlight (in hours per day). ",
+        assignment_text,
+        " She recorded the change in circumference of each tomato (in centimeters) after a week and calculated the total increase in circumference for each potted plant. Then she ran a linear regression on the data. Her data and the results of her linear regression are summarized in the tables below."
+      )
+    }
+  )
+)
+generate_slope_story = function (story) {
+  assignment_method = sample(story[["assignment_methods"]], 1)
+  sampling_method = sample(story[["sampling_methods"]], 1)
+  n = round(sample_from_range(story[["n_params"]]))
+  x_params = story[["x_params"]]
+  y_params = story[["y_params"]]
+  x = sapply(seq(x_params[["lower"]], x_params[["upper"]], length.out = n), siground, x_params[["sigfigs"]])
+  shape = story[["shape"]]
+  rise = (y_params[["upper"]] - y_params[["lower"]])
+  run = (x_params[["upper"]] - x_params[["lower"]])
+  constraints = story[["constraints"]]
+  if (shape == "linear") {
+    buffer = 2
+    # 3 standard deviations within the range from top to bottom
+    # should be about the top and bottom of the linear regression line
+    # there should be at least one standard deviation of change within
+    # that range, so the max sigma should be rise / 7.
+    # the smallest sigma should have a barely visible range,
+    # so 3*smallest_sigma >= rise*(smallest visible percent)
+    # i can see about 20 divisions easily in a small graph, so let's say
+    # smallest sigma is 0.05/3 or about 0.01
+    sigma_eps = runif(1, min = rise*0.01, max = rise/(buffer*2+1))
+    if (constraints == "increasing") {
+      direction = 1 
+    } else {
+      direction = sample(c(-1, 1, 0), 1)
+    }
+    # go 3 sigma within the y range above and below to get the y
+    # range of the regression line
+    beta1 = direction*(rise - 2*buffer*sigma_eps) / run
+    if (direction == 0) {
+      # 3 sigma above and below the line means for flat line, sigma
+      # is about rise / 6
+      sigma_eps = rise / (2*buffer)
+      # and for flat line, middle of y range is the intercept
+      beta0 = rise / 2 + y_params[["lower"]]
+    } else if (direction > 0) {
+      # if positive, top of graph should be 3 sigma down from
+      # ymax, and reached when xmax.
+      pred_y_max = y_params[["upper"]] - sigma_eps*buffer
+      pred_x_max = x_params[["upper"]]
+    } else if (direction < 0) {
+      # if negative, top of graph is the same, but reached when
+      # xmin
+      pred_y_max = y_params[["upper"]] - sigma_eps*buffer
+      pred_x_max = x_params[["lower"]]
+    }
+    beta0 = pred_y_max - beta1 * pred_x_max
+    
+    error = rnorm(n, mean = 0, sd = sigma_eps)
+    y = sapply(beta0 + beta1 * x + error, siground, y_params[["sigfigs"]])
+    plot(x,y)
+  } else if (shape == "quadratic") {
+    buffer = 2
+    sigma_eps = runif(1, min = rise*0.01, max = rise/(buffer*2+1))
+    
+    xmin = x_params[["lower"]]
+    xmax = x_params[["upper"]]
+    ymin = y_params[["lower"]] + buffer*sigma_eps
+    ymax = y_params[["upper"]] - buffer*sigma_eps
+    
+    error = rnorm(n, mean = 0, sd = sigma_eps)
+    # first, sample if we are concave up or down
+    a = sample(c(-1, 1), 1)
+    if (constraints == "increasing") {
+      print("increasing")
+      print(str_c("a direction: ", a))
+      if (a > 0) {
+        # if concave up and increasing, vertex is below xmin
+        h = runif(
+          1,
+          min = xmin - (xmax - xmin)/2,
+          max = xmin
+        )
+      } else {
+        # if concave down and increasing, vertex is above xmax
+        h = runif(
+          1,
+          min = xmax,
+          max = xmax + (xmax - xmin)/2
+        )
+      }
+      # if increasing, then f(xmin) = ymin and f(xmax) = ymax
+      a = a*(ymax - ymin) / ((xmax - h)^2 - (xmin-h)^2)
+      k = ymax - a*(xmax - h)^2
+    } else if (constraints == "decreasing") {
+      if (a > 0) {
+        # if concave up and decreasing, vertex is above xmax
+        h = runif(
+          1,
+          min = xmax,
+          max = xmax + (xmax - xmin)/2
+        )
+      } else {
+        # if concave down and decreasing, vertex is below xmin
+        h = runif(
+          1,
+          min = xmin - (xmax - xmin)/2,
+          max = xmin
+        )
+      }
+      # if decreasing, then f(xmin) = ymax and f(xmax) = ymin
+      a = a*(ymax - ymin) / ((xmax - h)^2 - (xmin-h)^2)
+      k = ymax - a*(xmin - h)^2
+    } else {
+        h = runif(
+          1,
+          min = xmin - (xmax - xmin)/2,
+          max = xmax + (xmax - xmin)/2
+        )
+        if (a > 0) {
+          # concave up
+          # possible minima are at x=xmin, x=xmax, and x=h
+          if (h < xmin) {
+            # vertex is to the left, so increasing function
+            a = a*(ymax - ymin) / ((xmax - h)^2 - (xmin-h)^2)
+            k = ymax - a*(xmax - h)^2
+          } else if (x > xmax) {
+            # vertex is to the right, so decreasing function
+            a = a*(ymax - ymin) / ((xmax - h)^2 - (xmin-h)^2)
+            k = ymax - a*(xmin - h)^2
+          } else {
+            # vertex is (h, ymin)
+            k = ymin
+            if (h < (xmin - xmax) / 2 + xmin) {
+              # vertex is towards the left side of the graph,
+              # so f(xmax) = ymax
+              a = (ymax - k) / (xmax - h)^2
+            } else {
+              # f(xmin) = ymax
+              a = (ymax - k) / (xmin - h)^2
+            }
+          }
+        } else {
+          # concave down
+          # possible maxima are at x=xmin, x=xmax, and x=h
+          if (h < xmin) {
+            # vertex is to the left, so decreasing function
+            a = a*(ymax - ymin) / ((xmax - h)^2 - (xmin-h)^2)
+            k = ymax - a*(xmin - h)^2
+          } else if (x > xmax) {
+            # vertex is to the right, so increasing function
+            a = a*(ymax - ymin) / ((xmax - h)^2 - (xmin-h)^2)
+            k = ymax - a*(xmax - h)^2
+          } else {
+            # vertex is (h, ymax)
+            k = ymax
+            if (h < (xmin - xmax) / 2 + xmin) {
+              # vertex is towards the left side of the graph,
+              # so f(xmax) = ymin
+              a = (ymin - k) / (xmax - h)^2
+            } else {
+              # f(xmin) = ymin
+              a = (ymin - k) / (xmin - h)^2
+            }
+          }
+        }
+    }
+    print(str_c("a = ", a))
+    print(str_c("h = ", h))
+    print(str_c("k = ", k))
+    y = a*(x - h)^2 + k + error
+  } else if (shape == "cubic") {
+    y = x
+  } else if (shape == "exponential") {
+    y = x
+  }
+  df = tibble(x, y) # x and y
+  m = lm(y~x)
+  summary_table =
+    (m %>% summary())$coefficients %>%
+    as_tibble() %>%
+    select(Estimate, `Std. Error`) # linear regression results
+  list(
+    "text" = story[["text"]](
+      list(
+        "assignment_method" = assignment_method,
+        "sampling_method" = sampling_method,
+        "n" = n
+      )
+    ),
+    "data" = df,
+    "summary" = summary_table,
+    "structure" = "slope"
+  )
+}
 ```
 
 ## Inference for a difference of proportions
@@ -529,14 +801,11 @@ generate_mean_story = function (story) {
 # generate_chisquared_story = function (story) {}
 ```
 
-# Random Quiz Question
+## Generate from seed
 
 ```{r}
-# 1 - proportion (test)
-# 4 - mean (interval)
-# 9 - mean (test)
-# 
-set.seed(3)
+generate_quiz_question = function(seed) {
+set.seed(seed)
 
 story_structure = sample(possible_story_structures, 1)
 if (story_structure == "proportion") {
@@ -545,9 +814,9 @@ if (story_structure == "proportion") {
 } else if (story_structure == "mean") {
   story = sample(mean_stories, 1)[[1]]
   story_text = generate_mean_story(story)
-# } else if (story_structure == "slope") {
-#   story = sample(slope_stories, 1)[[1]]
-#   story_text = generate_slope_story(story)
+} else if (story_structure == "slope") {
+  story = sample(slope_stories, 1)[[1]]
+  story_text = generate_slope_story(story)
 # } else if (story_structure == "difference of proportions") {
 #   story = sample(diffprop_stories, 1)[[1]]
 #   story_text = generate_diffprop_story(story)
@@ -563,12 +832,22 @@ if (story_structure == "proportion") {
 }
 # story_structure
 # story_text[["text"]]
+story_text
+}
 ```
+
+
+# Random Quiz Question
+
+```{r}
+story_text = generate_quiz_question(1)
+```
+
 
 `r story_text[["text"]]`
 
 ```{r}
-if (story_structure == "mean") {
+if (story_text[["structure"]] == "mean") {
   print(story_text[["data"]] %>% pull(x))
 # knitr::kable(story_text[["data"]], label = "Data")
 knitr::kable(story_text[["summary"]], label = "5-number summary")
@@ -599,8 +878,8 @@ What statistical analysis could you use to address the research question? ______
 
 Draw an appropriate graph of the sample data.
 
-`r if (story_structure %in% c("mean", "difference of means", "mean difference")) {"Describe the distribution."}`
-`r if (story_structure %in% c("slope")) {"Describe the relationship."}`
+`r if (story_text[["structure"]] %in% c("mean", "difference of means", "mean difference")) {"Describe the distribution."}`
+`r if (story_text[["structure"]] %in% c("slope")) {"Describe the relationship."}`
 
 ## Part 3: Critique the study design
 
@@ -613,6 +892,26 @@ Assume that the conditions are met (even if you showed in the previous section t
 State your conclusion in context, assuming conditions are met and the study design is good.
 
 ## Part 5: How much do you trust the conclusion, given the actual study design?
+
+
+# Testing
+
+```{r}
+# for (i in 2:30) {
+#   print(i)
+#   story_text = generate_quiz_question(i)
+#   print(story_text[["text"]])
+#   if (story_text[["structure"]] == "mean") {
+#     hist(story_text[["data"]][[1]], main = str_c(story_text[["structure"]], ", seed=", i))
+#     print(story_text[["summary"]])
+#   }
+#   if (story_text[["structure"]] == "slope") {
+#     f = plot(story_text[["data"]], main = str_c("seed=", i))
+#     print(f)
+#     print(story_text[["summary"]])
+#   }
+# }
+```
 
 
 
