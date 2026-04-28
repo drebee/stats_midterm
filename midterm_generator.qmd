@@ -78,7 +78,7 @@ sample_x = function(sampling_function, direction, label, h0) {
 ```{r}
 possible_story_structures = c(
   "proportion",
-  #"difference of proportions",
+  "difference of proportions",
   "mean",
   #"difference of means",
   #"mean difference",
@@ -445,7 +445,7 @@ generate_mean_story = function (story) {
       mu_params = story[["mu_params"]]
       if (direction == "lower") {
         mu_params[["upper"]] = mu0
-      } else if (direction == "upper") {
+      } else if (direction == "higher") {
         mu_params[["lower"]] = mu0
       }
       mu = sample_from_range(mu_params)
@@ -528,28 +528,44 @@ slope_stories = list(
   #     )
   #   }
   # ),
-  # "heat" = list(
-  #   "assignment_methods" = c("random"),
-  #   "n_params" = c("lower" = , "upper" = , "sigfigs" = ),
-  #   "x_params" = c("lower" = , "upper" = , "sigfigs" = ),
-  #   "y_params" = c("lower" = , "upper" = , "sigfigs" = ),
-  #   "constraints" = "decreasing",
-  #   "shape" = sample(c("linear", "quadratic"), 1),#, "exponential", "cubic"), 1),
-  #   "sampling_methods" = c("census"),
-  #   "text" = function(params) {
-  #     sampling_method = params[["sampling_method"]]
-  #     if (sampling_method == "census") {
-  #       sampling_text = str_c()
-  #     }
-  #     assignment_method = params[["assignment_method"]]
-  #     if (assignment_method == "random") {
-  #     }
-  #     str_c(
-  #       "Cindy wants to predict how much energy she will use to heat her home based on how cold it is outside. The table below shows the mean amount of gas per day (in cubic meters) that Cindy used each month and the average temperature that month (in degrees Celsius) for one heating season."
-  #     )
-  #   }
-  # ),
+  "books" = list(
+    "assignment_methods" = c("NA"),
+    "procedure" = sample(c("test", "interval"), 1),
+    "n_params" = c("lower" = 5, "upper" = 12, "sigfigs" = 2),
+    "variable_names" = c("Copies sold (thousands)", "Ratings below 3 stars (hundreds)"),
+    "x_params" = c("lower" = 0, "upper" = 5, "sigfigs" = 2),
+    "y_params" = c("lower" = 0, "upper" = 15, "sigfigs" = 3),
+    "constraints" = "decreasing",
+    "shape" = sample(c("linear", "quadratic"), 1),#, "exponential", "cubic"), 1),
+    "sampling_methods" = c("random", "stratified"),
+    "text" = function(params) {
+      sampling_method = params[["sampling_method"]]
+      if (sampling_method == "random") {
+        sampling_text = str_c(
+          "Each book they have ever sold has an ID number associated with it. The publisher randomly samples ", params[["n"]], " ID numbers."
+        )
+      } else if (sampling_method == "stratified") {
+        sampling_text = str_c(
+          "For each of the past ", params[["n"]], " years, the publisher randomly samples one book."
+        )
+      }
+      if (params[["procedure"]] == "test") {
+        question_text = "A publisher wants to find out if there is a relationship between how many copies of a book they sell and how many ratings below three stars the book gets."
+      } else if (params[["procedure"]] == "interval") {
+        question_text = "A publisher wants to find out a range of possible values for the relationship between how many copies of a book they sell and how many ratings below three stars the book gets."
+      }
+      assignment_method = params[["assignment_method"]]
+      str_c(
+        question_text,
+        " ",
+        sampling_text,
+        "They record the number of copies sold and the number of ratings below three stars for each book sampled. They ran a linear regression on the data. Their data and the results of the linear regression are summarized in the tables below."
+      )
+    }
+  ),
   "tomatoes" = list(
+    "procedure" = sample(c("test", "interval"), 1),
+    "variable_names" = c("hours of light per day", "change in circumference (cm)"),
     "assignment_methods" = c("random", "confound"),
     "n_params" = c("lower" = 5, "upper" = 12, "sigfigs" = 2),
     "x_params" = c("lower" = 0, "upper" = 8, "sigfigs" = 1),
@@ -559,10 +575,14 @@ slope_stories = list(
     "sampling_methods" = c("census", "convenience"),
     "text" = function(params) {
       sampling_method = params[["sampling_method"]]
-      if (sampling_method == "census") {
+      if (sampling_method == "census" && params[["procedure"]] == "interval") {
         sampling_text = str_c("Cheryl is curious how different amounts of artificial sunlight will impact the growth of her tomatoes.")
-      } else if (sampling_method == "convenience") {
+      } else if (sampling_method == "convenience" && params[["procedure"]] == "interval") {
         sampling_text = str_c("Cheryl is curious how different amounts of artificial sunlight could impact the growth of tomato plants.")
+      } else if (sampling_method == "census" && params[["procedure"]] == "test") {
+        sampling_text = str_c("Cheryl is curious whether different amounts of artificial sunlight will impact the growth of her tomatoes.")
+      } else if (sampling_method == "convenience" && params[["procedure"]] == "test") {
+        sampling_text = str_c("Cheryl is curious whether different amounts of artificial sunlight impacts the growth of tomatoes.")
       }
       assignment_method = params[["assignment_method"]]
       if (assignment_method == "random") {
@@ -571,7 +591,16 @@ slope_stories = list(
         )
       } else if (assignment_method == "confound") {
         assignment_text = str_c(
-          "She arranges the pots aesthetically from smallest (on the left) to largest (on the right) under the grow lights. Then she programs the grow lights so that the left-most plants get the least sunlight and the right-most plants get the most sunlight."
+          "She arranges the pots aesthetically from smallest (on the left) to largest (on the right) under the grow lights. Then she programs the grow lights so that the left-most plants get the least light and the right-most plants get the most light."
+        )
+      }
+      if (params[["procedure"]] == "test") {
+        str_c(
+          "Cheryl wants to know (at a significance level of ", params[["alpha"]], ") whether there is a linear relationship between amount of light and amount of growth."
+        )
+      } else if (params[["procedure"]] == "interval") {
+        str_c(
+          "Cheryl wants to find a range of plausible values for the slope between amount of light and amount of growth."
         )
       }
       str_c(
@@ -621,18 +650,20 @@ generate_slope_story = function (story) {
       sigma_eps = rise / (2*buffer)
       # and for flat line, middle of y range is the intercept
       beta0 = rise / 2 + y_params[["lower"]]
-    } else if (direction > 0) {
-      # if positive, top of graph should be 3 sigma down from
-      # ymax, and reached when xmax.
-      pred_y_max = y_params[["upper"]] - sigma_eps*buffer
-      pred_x_max = x_params[["upper"]]
-    } else if (direction < 0) {
-      # if negative, top of graph is the same, but reached when
-      # xmin
-      pred_y_max = y_params[["upper"]] - sigma_eps*buffer
-      pred_x_max = x_params[["lower"]]
+    } else {
+      if (direction > 0) {
+        # if positive, top of graph should be 3 sigma down from
+        # ymax, and reached when xmax.
+        pred_y_max = y_params[["upper"]] - sigma_eps*buffer
+        pred_x_max = x_params[["upper"]]
+      } else if (direction < 0) {
+        # if negative, top of graph is the same, but reached when
+        # xmin
+        pred_y_max = y_params[["upper"]] - sigma_eps*buffer
+        pred_x_max = x_params[["lower"]]
+      }
+      beta0 = pred_y_max - beta1 * pred_x_max
     }
-    beta0 = pred_y_max - beta1 * pred_x_max
     
     error = rnorm(n, mean = 0, sd = sigma_eps)
     y = sapply(beta0 + beta1 * x + error, siground, y_params[["sigfigs"]])
@@ -752,7 +783,10 @@ generate_slope_story = function (story) {
   } else if (shape == "exponential") {
     y = x
   }
+  confidence_level = sample(c(80, 85, 90, 95, 99), 1)
+  alpha = 1 - confidence_level/100
   df = tibble(x, y) # x and y
+  names(df) = story[["variable_names"]]
   m = lm(y~x)
   summary_table =
     (m %>% summary())$coefficients %>%
@@ -763,7 +797,10 @@ generate_slope_story = function (story) {
       list(
         "assignment_method" = assignment_method,
         "sampling_method" = sampling_method,
-        "n" = n
+        "n" = n,
+        "alpha" = alpha,
+        "confidence_level" = confidence_level,
+        "procedure" = story[["procedure"]]
       )
     ),
     "data" = df,
@@ -773,14 +810,151 @@ generate_slope_story = function (story) {
 }
 ```
 
-## Inference for a difference of proportions
+## Difference of proportions
 
 ```{r}
-# diffprop_stories = list()
-# generate_diffprop_story = function (story) {}
+diffprop_stories = list(
+  
+  # "" = list(
+  #   "procedure" = sample(c("test", "interval"), ),
+  #   "p0" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "p" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "sampling_methods" = c("random"),
+  #   "n_params" = c("lower" = , "upper" = , "sigfigs" = ),
+  #   "direction" = sample(c("higher", "lower", "different")),
+  #   "text" = function(params) {
+  #     sampling_method = params[["sampling_method"]]
+  #     if (sampling_method == "") {
+  #       sampling_text = str_c()
+  #     }
+  #     if (params[["procedure"]] == "interval") {
+  #       question = str_c()
+  #     } else {
+  #       question = str_c()
+  #     }
+  #     str_c(
+  #     )
+  #   }
+  # ),
+  
+  "fruit" = list(
+    "procedure" = sample(c("test", "interval"), 1),
+    "p1_params" = c("lower" = .3, "upper" = .7, "sigfigs" = 2),
+    "p2_params" = c("lower" = .3, "upper" = .7, "sigfigs" = 2),
+    "sampling_methods" = c("random", "convenience"),
+    "n1_params" = c("lower" = 10, "upper" = 200, "sigfigs" = 2),
+    "n2_params" = c("lower" = 10, "upper" = 200, "sigfigs" = 2),
+    "direction" = sample(c("one-sided", "two-sided"), 1),
+    "text" = function(params) {
+      sampling_method = params[["sampling_method"]]
+      
+      if (sampling_method == "random") {
+        sampling_text = str_c("She took separate random samples of each type of fruit.")
+      } else if (sampling_method == "convenience") {
+        sampling_text = str_c("She went to the nearest orange and tangerine trees and collected some of each fruit.")
+      }
+      if (params[["procedure"]] == "interval") {
+        question = str_c(
+          "She wants to use these results to make an interval to estimate the difference between the proportion of each type of fruit that has the disease."
+        )
+      } else {
+        if (params[["direction"]] == "higher") {
+          question = str_c(
+            "She wants to use these results to test her hypothesis that her oranges are more likely to have the disease than her tangerines."
+          )
+        } else if (params[["direction"]] == "lower") {
+          question = str_c(
+            "She wants to use these results to test her hypothesis that her oranges are less likely to have the disease than her tangerines."
+          )
+          
+        } else  {
+          question = str_c("She wants to use these results to test her hypothesis that oranges and tangerines are not equally likely to have the disease.")
+        }
+      }
+      if (params[["direction"]] == "higher") {
+        
+        suspicion = "she suspects that her oranges are more likely to have the disease than her tangerines. "
+      } else if (params[["direction"]] == "lower") {
+        suspicion = "she suspects that her oranges are less likely to have the disease than her tangerines. "
+        
+      } else {
+        suspicion = "she suspects that the disease affects one of the fruits more than the other."
+      }
+      str_c(
+        "Kumari owns a farm that grows thousands of oranges and tangerines. A disease is affecting her fruit, and ",
+        suspicion,
+        " ",
+        sampling_text,
+        " She found that ", params[["x1"]], " of the ", params[["n1"]], " oranges sampled had the disease, and ", params[["x2"]], " of the ", params[["n2"]], " tangerines sampled had the disease. ",
+        question
+      )
+    }
+  )
+)
+generate_diffprop_story = function (story) {
+  
+procedure = story[["procedure"]]
+
+n1 = round(sample_from_range(story[["n1_params"]]))
+n2 = round(sample_from_range(story[["n2_params"]]))
+p1 = sample_from_range(story[["p1_params"]])
+p2 = sample_from_range(story[["p2_params"]])
+
+direction = story[["direction"]]
+
+keep_going = TRUE
+
+while (keep_going) {
+
+x1 = round(rbinom(1, n1, p1))
+x2 = round(rbinom(1, n2, p2))
+
+phat1 = x1 / n1
+phat2 = x2 / n2
+
+if (phat1 != phat2) {
+  keep_going = FALSE
+}
+}
+
+if (direction == "one-sided") {
+  if (phat1 > phat2) {
+    direction = "higher"
+  } else {
+    direction = "lower"
+  }
+} else {
+  direction = "different"
+}
+
+
+confidence_level = sample(c(80, 85, 90, 95, 99), 1)
+alpha = 1 - confidence_level/100
+
+sampling_method = sample(story[["sampling_methods"]], 1)
+
+list(
+  "text" = story[["text"]](
+    list(
+      "x1" = x1,
+      "n1" = n1,
+      "x2" = x2,
+      "n2" = n2,
+      "phat1" = phat1,
+      "phat2" = phat2,
+      "procedure" = procedure,
+      "direction" = direction,
+      "sampling_method" = sampling_method,
+      "alpha" = alpha,
+      "confidence_level" = confidence_level
+    )
+  ),
+  "structure" = "difference of proportions"
+)
+}
 ```
 
-## Inference for a differene of means
+## Inference for a difference of means
 
 ```{r}
 # diffmean_stories = list()
@@ -817,9 +991,9 @@ if (story_structure == "proportion") {
 } else if (story_structure == "slope") {
   story = sample(slope_stories, 1)[[1]]
   story_text = generate_slope_story(story)
-# } else if (story_structure == "difference of proportions") {
-#   story = sample(diffprop_stories, 1)[[1]]
-#   story_text = generate_diffprop_story(story)
+} else if (story_structure == "difference of proportions") {
+  story = sample(diffprop_stories, 1)[[1]]
+  story_text = generate_diffprop_story(story)
 # } else if (story_structure == "difference of means") {
 #   story = sample(diffmean_stories, 1)[[1]]
 #   story_text = generate_diffmean_story(story)
@@ -836,13 +1010,11 @@ story_text
 }
 ```
 
-
 # Random Quiz Question
 
 ```{r}
 story_text = generate_quiz_question(1)
 ```
-
 
 `r story_text[["text"]]`
 
@@ -854,32 +1026,29 @@ knitr::kable(story_text[["summary"]], label = "5-number summary")
 }
 ```
 
-
 ## Part 1: Identify the study design
 
-The individuals in this study are: 
+The individuals in this study are:
 
-How many variables are there and what is/are the variable type(s)?
-(Check one box and fill out the question below it.)
+How many variables are there and what is/are the variable type(s)? (Check one box and fill out the question below it.)
 
-* [ ] There is one variable in the study.
-    * Variable _________ is (categorical / quantitative)
-* [ ] There are two variables in the study.
-    * Variable _________ is (categorical / quantitative)
-    * Variable _________ is (categorical / quantitative)
+-   [ ] There is one variable in the study.
+    -   Variable \_\_\_\_\_\_\_\_\_ is (categorical / quantitative)
+-   [ ] There are two variables in the study.
+    -   Variable \_\_\_\_\_\_\_\_\_ is (categorical / quantitative)
+    -   Variable \_\_\_\_\_\_\_\_\_ is (categorical / quantitative)
 
-The sample is: __________
+The sample is: \_\_\_\_\_\_\_\_\_\_
 
-The population of interest is: ________
+The population of interest is: \_\_\_\_\_\_\_\_
 
-What statistical analysis could you use to address the research question? _____________
+What statistical analysis could you use to address the research question? \_\_\_\_\_\_\_\_\_\_\_\_\_
 
 ## Part 2: Represent the data
 
 Draw an appropriate graph of the sample data.
 
-`r if (story_text[["structure"]] %in% c("mean", "difference of means", "mean difference")) {"Describe the distribution."}`
-`r if (story_text[["structure"]] %in% c("slope")) {"Describe the relationship."}`
+`r if (story_text[["structure"]] %in% c("mean", "difference of means", "mean difference")) {"Describe the distribution."}` `r if (story_text[["structure"]] %in% c("slope")) {"Describe the relationship."}`
 
 ## Part 3: Critique the study design
 
@@ -892,7 +1061,6 @@ Assume that the conditions are met (even if you showed in the previous section t
 State your conclusion in context, assuming conditions are met and the study design is good.
 
 ## Part 5: How much do you trust the conclusion, given the actual study design?
-
 
 # Testing
 
@@ -912,11 +1080,6 @@ State your conclusion in context, assuming conditions are met and the study desi
 #   }
 # }
 ```
-
-
-
-
-
 
 ```{r}
 # set.seed(1)
